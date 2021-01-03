@@ -77,7 +77,7 @@ export let valueDisplayFunction = (v) => v;
 onMount(async () => {
     dashLength()
     clearInterval(interval);
-    console.log(min,max,value)
+  
     interval = null;
     if (animation.animateValue) {
         interval = setInterval(() => {
@@ -149,7 +149,7 @@ function updatePosition(offsetX, offsetY) {
        
         return;
     }
-    console.log(mappedValue)
+    
 
     value = Math.round((mappedValue - min) / step) * step + min;
 
@@ -214,7 +214,7 @@ function onTouchMove(e) {
 };
 
 function dashLength() {
-    console.log(pathValue)
+   
     let element = pathValue;
     let length = element.getTotalLength()
     if (animation.animated) {
