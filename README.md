@@ -5,6 +5,9 @@ Knob control for Svelte.js
 ```shell
 npm install svelte-knob --save
 ```
+## Demo
+
+https://svelte.dev/repl/609b8f2e4540442197fc12cbc4165d55?version=3.31.1
 
 ## Usage
 
