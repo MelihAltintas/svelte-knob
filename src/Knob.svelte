@@ -5,12 +5,22 @@
         on:mouseup="{onMouseUp}"
         on:touchstart="{onTouchStart}"
         on:touchend="{onTouchEnd}">
-        <path
-            d="{rangePath}"
-            stroke-width="{strokeWidth}"
-            stroke="{secondaryColor}"
-            class="knob-control__range">
-        </path>
+        {#if !circular}
+            <path
+                d="{rangePath}"
+                stroke-width="{strokeWidth}"
+                stroke="{secondaryColor}"
+                class="knob-control__range">
+            </path>
+        {:else}
+            <circle
+                cx={MID_X} cy={MID_Y}
+                r={RADIUS}
+                fill="none"
+                stroke={secondaryColor} stroke-width={strokeWidth}
+                class="knob-control__range"
+            />
+        {/if}
 
         {#if showValue}
         <path
@@ -22,10 +32,14 @@
             style="{dashStyle}"
             class="knob-control__value">
         </path>
+        {/if}
+
+        {#if showNumber}
         <text
             x="50"
-            y="57"
+            y="50"
             text-anchor="middle"
+            alignment-baseline="central"
             fill="{textColor}"
             class="knob-control__text-display">
             {valueDisplay}
@@ -42,8 +56,16 @@ import {
 const RADIUS = 40;
 const MID_X = 50;
 const MID_Y = 50;
-const MIN_RADIANS = 4 * Math.PI / 3;
-const MAX_RADIANS = -Math.PI / 3;
+
+$: MIN_RADIANS = circular
+  ? 2 * Math.PI * 3/4 // bottom
+  : 2 * Math.PI * 4/6 // bottom-left-bottom
+;
+
+$: MAX_RADIANS = circular
+  ? 2 * Math.PI * -1/4 // bottom
+  : 2 * Math.PI * -1/6 // bottom-right-bottom
+;
 
 let pathValue;
 let knob;
@@ -59,10 +81,14 @@ export let animation = {
     animationFunction: 'ease-in-out',
 }
 
+export let circular = false;
+export let modulo = false;
+
 export let value = 0;
 export let max = 100;
 export let min = 0;
 export let showValue = true;
+export let showNumber = true;
 
 export let disabled = false;
 export let step = 1;
@@ -100,9 +126,17 @@ $: style = 'height:' + (responsive ? size + '%' : size - 5 + 'px');
 
 $: computedSize = responsive ? size + '%' : size
 
-$: rangePath = `M ${minX} ${minY} A ${RADIUS} ${RADIUS} 0 1 1 ${maxX} ${maxY}`;
+$: rangePath = circular ? '' : `M ${minX} ${minY} A ${RADIUS} ${RADIUS} 0 1 1 ${maxX} ${maxY}`;
 
-$: valuePath = `M ${zeroX} ${zeroY} A ${RADIUS} ${RADIUS} 0 ${largeArc} ${sweep} ${valueX} ${valueY}`;
+const rangeCircle = {
+  cx: 10,
+  cy: 20,
+};
+
+$: valuePath = circular
+  ? `M ${valueX} ${valueY} A ${RADIUS} ${RADIUS} 0 ${largeArc} ${sweep} ${valueX2} ${valueY2}`
+  : `M ${zeroX} ${zeroY} A ${RADIUS} ${RADIUS} 0 ${largeArc} ${sweep} ${valueX} ${valueY}`
+;
 
 
 $: zeroRadians = (min > 0 && max > 0) ?mapRange(min, min, max, MIN_RADIANS, MAX_RADIANS):mapRange(0, min, max, MIN_RADIANS, MAX_RADIANS);
@@ -121,16 +155,36 @@ $: zeroX = MID_X + Math.cos(zeroRadians) * RADIUS;
 
 $: zeroY =MID_Y - Math.sin(zeroRadians) * RADIUS;
 
-$: valueX =MID_X + Math.cos(valueRadians) * RADIUS;
+// TODO (allow to) use straight line? radius not arc
 
-$: valueY = MID_Y - Math.sin(valueRadians) * RADIUS;
+const circularSize = 0.2;
 
-$: largeArc = Math.abs(zeroRadians - valueRadians) < Math.PI ? 0 : 1;
+$: valueX = circular
+  ? MID_X + Math.cos(valueRadians - circularSize) * RADIUS
+  : MID_X + Math.cos(valueRadians) * RADIUS
+;
 
-$: sweep = valueRadians > zeroRadians ? 0 : 1;
+$: valueY = circular
+  ? MID_Y - Math.sin(valueRadians - circularSize) * RADIUS
+  : MID_Y - Math.sin(valueRadians) * RADIUS
+;
+
+$: valueX2 = circular ? MID_X + Math.cos(valueRadians + circularSize) * RADIUS : 0;
+$: valueY2 = circular ? MID_Y - Math.sin(valueRadians + circularSize) * RADIUS : 0;
+
+$: largeArc = circular ? 0 : (Math.abs(zeroRadians - valueRadians) < Math.PI ? 0 : 1);
+
+$: sweep = circular ? 0 : (valueRadians > zeroRadians ? 0 : 1);
 
 $: valueDisplay = animation.animateValue ? valueDisplayFunction(animatedValue):valueDisplayFunction(value);
 
+function positiveModulo(n, m) {
+    return ((n % m) + m) % m;
+}
+
+let lastAngle = 0;
+let valueBias = 0;
+let angleBias = 0;
 
 function updatePosition(offsetX, offsetY) {
     const dx = offsetX - size / 2;
@@ -140,20 +194,54 @@ function updatePosition(offsetX, offsetY) {
     let mappedValue;
 
     const start = -Math.PI / 2 - Math.PI / 6;
-   
+
+    if (circular) {
+        // detect overflow
+        const angleDiff = angle - lastAngle;
+        if (angleDiff > Math.PI) {
+
+            console.log(`overflow: valueBias ${valueBias} -> ${valueBias + max}`);
+            console.log(`overflow: angleBias ${angleBias} -> ${angleBias - 2*Math.PI - (MAX_RADIANS - MIN_RADIANS)}`);
+
+            valueBias = valueBias + max; // TODO verify: assert min == 0
+            angleBias = angleBias - 2*Math.PI - (MAX_RADIANS - MIN_RADIANS);
+        }
+        else if (angleDiff < (-1 * Math.PI)) {
+
+            console.log(`overflow: valueBias ${valueBias} -> ${valueBias - max}`);
+            console.log(`overflow: angleBias ${angleBias} -> ${angleBias + 2*Math.PI + (MAX_RADIANS - MIN_RADIANS)}`);
+
+            valueBias = valueBias - max; // TODO verify: assert min == 0
+            angleBias = angleBias + 2*Math.PI + (MAX_RADIANS - MIN_RADIANS);
+        }
+
+        mappedValue = mapRange(angleBias + angle + 2 * Math.PI, MIN_RADIANS, MAX_RADIANS, min, max);
+
+        // TODO avoid some calculation if step is disabled
+        value = valueBias + Math.round((mappedValue - min) / step) * step + min;
+        //value = Math.round((mappedValue - min) / step) * step + min;
+
+        if (modulo !== false) {
+            value = positiveModulo(value, modulo);
+        }
+
+        lastAngle = angle;
+        return;
+    }
+
     if (angle > MAX_RADIANS) {
         mappedValue = mapRange(angle, MIN_RADIANS, MAX_RADIANS, min, max);
     } else if (angle < start) {
         mappedValue = mapRange(angle + 2 * Math.PI, MIN_RADIANS, MAX_RADIANS, min, max);
     } else {
        
+        lastAngle = angle;
         return;
     }
     
 
     value = Math.round((mappedValue - min) / step) * step + min;
-
- 
+    lastAngle = angle;
 };
 
 function onClick(e) {
@@ -235,6 +323,10 @@ function mapRange(x, inMin, inMax, outMin, outMax)  {
     100% {
         stroke-dashoffset: 0;
     }
+}
+
+.knob-control {
+    user-select: none; /* disable text selection on click + drag */
 }
 
 .knob-control__range {
