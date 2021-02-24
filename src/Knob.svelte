@@ -22,7 +22,7 @@
             />
         {/if}
 
-        {#if showValue}
+        {#if showValue && !isUndefined}
         <path
             d="{valuePath}"
             stroke-width="{strokeWidth}"
@@ -45,6 +45,17 @@
             {valueDisplay}
         </text>
         {/if}
+
+        {#if allowUndefined}
+            <circle
+                cx={MID_X} cy={MID_Y}
+                r={isUndefined ? RADIUS * 0.25 : RADIUS * 0.4}
+                fill={isUndefined ? primaryColor : 'transparent'}
+                class="knob-control__switch"
+                on:click={toggleUndefined}
+            />
+        {/if}
+
     </svg>
 </div>
 
@@ -84,7 +95,7 @@ export let animation = {
 export let circular = false;
 export let modulo = false;
 
-export let value = 0;
+export let value = undefined;
 export let max = 100;
 export let min = 0;
 export let showValue = true;
@@ -99,6 +110,23 @@ export let secondaryColor = '#dcdfe6';
 export let textColor = '#000000';
 export let strokeWidth = 17;
 export let valueDisplayFunction = (v) => v;
+
+export let allowUndefined = false;
+export let isUndefined = false;
+
+let lastValue;
+
+function toggleUndefined(event) {
+    isUndefined = !isUndefined;
+    if (isUndefined) {
+        lastValue = value;
+        value = undefined;
+    }
+    else {
+        value = lastValue;
+    }
+    event.stopPropagation();
+}
 
 onMount(async () => {
     dashLength()
@@ -115,6 +143,16 @@ onMount(async () => {
             }
         }, (animation.animationDuration * 1000) / value / 1000);
     }
+
+    // detect if initial value is undefined
+    if (value === undefined) {
+        if (allowUndefined) {
+            isUndefined = true;
+        }
+        else {
+            value = 0; // init value. or use min?
+        }
+    }
 });
 
 $: dashStyle = {
@@ -126,14 +164,14 @@ $: style = 'height:' + (responsive ? size + '%' : size - 5 + 'px');
 
 $: computedSize = responsive ? size + '%' : size
 
-$: rangePath = circular ? '' : `M ${minX} ${minY} A ${RADIUS} ${RADIUS} 0 1 1 ${maxX} ${maxY}`;
+$: rangePath = (value === undefined) ? '' : circular ? '' : `M ${minX} ${minY} A ${RADIUS} ${RADIUS} 0 1 1 ${maxX} ${maxY}`;
 
 const rangeCircle = {
   cx: 10,
   cy: 20,
 };
 
-$: valuePath = circular
+$: valuePath = (value === undefined) ? '' : circular
   ? `M ${valueX} ${valueY} A ${RADIUS} ${RADIUS} 0 ${largeArc} ${sweep} ${valueX2} ${valueY2}`
   : `M ${zeroX} ${zeroY} A ${RADIUS} ${RADIUS} 0 ${largeArc} ${sweep} ${valueX} ${valueY}`
 ;
@@ -199,18 +237,10 @@ function updatePosition(offsetX, offsetY) {
         // detect overflow
         const angleDiff = angle - lastAngle;
         if (angleDiff > Math.PI) {
-
-            console.log(`overflow: valueBias ${valueBias} -> ${valueBias + max}`);
-            console.log(`overflow: angleBias ${angleBias} -> ${angleBias - 2*Math.PI - (MAX_RADIANS - MIN_RADIANS)}`);
-
             valueBias = valueBias + max; // TODO verify: assert min == 0
             angleBias = angleBias - 2*Math.PI - (MAX_RADIANS - MIN_RADIANS);
         }
         else if (angleDiff < (-1 * Math.PI)) {
-
-            console.log(`overflow: valueBias ${valueBias} -> ${valueBias - max}`);
-            console.log(`overflow: angleBias ${angleBias} -> ${angleBias + 2*Math.PI + (MAX_RADIANS - MIN_RADIANS)}`);
-
             valueBias = valueBias - max; // TODO verify: assert min == 0
             angleBias = angleBias + 2*Math.PI + (MAX_RADIANS - MIN_RADIANS);
         }
@@ -226,6 +256,7 @@ function updatePosition(offsetX, offsetY) {
         }
 
         lastAngle = angle;
+        isUndefined = false;
         return;
     }
 
@@ -241,6 +272,7 @@ function updatePosition(offsetX, offsetY) {
     
 
     value = Math.round((mappedValue - min) / step) * step + min;
+    isUndefined = false;
     lastAngle = angle;
 };
 
