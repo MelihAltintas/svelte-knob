@@ -1,4 +1,4 @@
-<div class="knob-control" style="{style}" bind:this={knob}>
+<div class:knob-control={true} class={_class} style={style} bind:this={knob}>
     <svg width="{computedSize}" height="{computedSize}" viewBox="0 0 100 100"
         on:click="{onClick}"
         on:mousedown="{onMouseDown}"
@@ -73,6 +73,10 @@ export let secondaryColor = '#dcdfe6';
 export let textColor = '#000000';
 export let strokeWidth = 17;
 export let valueDisplayFunction = (v) => v;
+
+// workaround for reserved word 'class'
+let _class;
+export { _class as class };
 
 onMount(async () => {
     dashLength()
