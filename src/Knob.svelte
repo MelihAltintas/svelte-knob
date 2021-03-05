@@ -36,8 +36,11 @@
 
 <script>
 import {
-    onMount
+    onMount, 
+    createEventDispatcher
 } from 'svelte'
+
+const dispatch = createEventDispatcher();
 
 const RADIUS = 40;
 const MID_X = 50;
@@ -51,6 +54,8 @@ let knob;
 let length = 0;
 let animatedValue = 0;
 let interval = null;
+let isChanging = false;
+let changeStartValue;
 
 export let animation = {
     animated: false,
@@ -59,6 +64,7 @@ export let animation = {
     animationFunction: 'ease-in-out',
 }
 
+export let name = ""
 export let value = 0;
 export let max = 100;
 export let min = 0;
@@ -72,7 +78,7 @@ export let primaryColor = '#409eff';
 export let secondaryColor = '#dcdfe6';
 export let textColor = '#000000';
 export let strokeWidth = 17;
-export let valueDisplayFunction = (v) => v;
+export let valueDisplayFunction;
 
 onMount(async () => {
     dashLength()
@@ -129,8 +135,24 @@ $: largeArc = Math.abs(zeroRadians - valueRadians) < Math.PI ? 0 : 1;
 
 $: sweep = valueRadians > zeroRadians ? 0 : 1;
 
-$: valueDisplay = animation.animateValue ? valueDisplayFunction(animatedValue):valueDisplayFunction(value);
+$: valueDisplay = animation.animateValue ? valueDisplayFunction(animatedValue) : value;
 
+function changeHandler(message) {
+    // Dispatch event:
+    //   (message, (name, value, delta))
+    // Messages: 'changing', 'changeStart', 'changeEnd'
+    const delta = (value - changeStartValue) || 0;
+    if (message === 'changing') {
+        if (!delta || !isChanging) message = null
+    } else if (message === 'changeStart') {
+        isChanging = true;
+        changeStartValue = value;
+    } else if (message === 'changeEnd') {
+        isChanging = false;
+        changeStartValue = null;
+    }
+    if (message) dispatch(message, {name, value, delta});
+}
 
 function updatePosition(offsetX, offsetY) {
     const dx = offsetX - size / 2;
@@ -152,7 +174,7 @@ function updatePosition(offsetX, offsetY) {
     
 
     value = Math.round((mappedValue - min) / step) * step + min;
-
+    changeHandler('changing')
  
 };
 
@@ -167,6 +189,7 @@ function onClick(e) {
 function onMouseDown(e) {
     if (!disabled) {
         e.preventDefault();
+        changeHandler('changeStart')
         window.addEventListener('mousemove', onMouseMove);
         window.addEventListener('mouseup', onMouseUp);
     }
@@ -175,6 +198,7 @@ function onMouseDown(e) {
 function onMouseUp(e) {
     if (!disabled) {
         e.preventDefault();
+        changeHandler('changeEnd');
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseup', onMouseUp);
     }
@@ -183,6 +207,7 @@ function onMouseUp(e) {
 function onTouchStart(e) {
     if (!disabled) {
         e.preventDefault();
+        changeHandler('changeStart');
         window.addEventListener('touchmove', onTouchMove);
         window.addEventListener('touchend', onTouchEnd);
     }
@@ -191,6 +216,7 @@ function onTouchStart(e) {
 function onTouchEnd(e) {
     if (!disabled) {
         e.preventDefault();
+        changeHandler('changeEnd');
         window.removeEventListener('touchmove', onTouchMove);
         window.removeEventListener('touchend', onTouchEnd);
     }
