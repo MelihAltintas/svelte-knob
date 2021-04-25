@@ -9,6 +9,8 @@ npm install svelte-knob --save
 
 https://svelte.dev/repl/609b8f2e4540442197fc12cbc4165d55?version=3.31.1
 
+[![Stargazers repo roster for @MelihAltintas/svelte-knob](https://reporoster.com/stars/MelihAltintas/svelte-knob)](https://github.com/MelihAltintas/svelte-knob/stargazers)
+[![Forkers repo roster for @MelihAltintas/svelte-knob](https://reporoster.com/forks/MelihAltintas/svelte-knob)](https://github.com/MelihAltintas/svelte-knob/network/members)
 ## Usage
 
 ```javascript
